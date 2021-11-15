@@ -30,7 +30,7 @@ extern "C" {
 #  define GGPO_API
 #endif
 
-#define GGPO_MAX_PLAYERS                  4
+#define GGPO_MAX_PLAYERS                  6
 #define GGPO_MAX_PREDICTION_FRAMES        8
 #define GGPO_MAX_SPECTATORS              32
 

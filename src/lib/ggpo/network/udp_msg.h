@@ -9,7 +9,7 @@
 #define _UDP_MSG_H
 
 #define MAX_COMPRESSED_BITS       4096
-#define UDP_MSG_MAX_PLAYERS          4
+#define UDP_MSG_MAX_PLAYERS          6
 
 #pragma pack(push, 1)
 
