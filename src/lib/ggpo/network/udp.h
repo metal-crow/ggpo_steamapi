@@ -12,10 +12,10 @@
 #include "udp_msg.h"
 #include "ggponet.h"
 #include "ring_buffer.h"
-
-#define MAX_UDP_ENDPOINTS     16
-
-static const int MAX_UDP_PACKET_SIZE = 4096;
+#pragma warning( push )
+#pragma warning( disable : 4996 )
+#include "steam_api.h"
+#pragma warning( pop )
 
 class Udp : public IPollSink
 {
@@ -28,7 +28,7 @@ public:
 
    struct Callbacks {
       virtual ~Callbacks() { }
-      virtual void OnMsg(sockaddr_in &from, UdpMsg *msg, int len) = 0;
+      virtual void OnMsg(SteamNetworkingIdentity &from, UdpMsg *msg, int len) = 0;
    };
 
 
@@ -38,18 +38,22 @@ protected:
 public:
    Udp();
 
-   void Init(uint16 port, Poll *p, Callbacks *callbacks);
+   bool Init(Poll *p, Callbacks *callbacks);
    
-   void SendTo(char *buffer, int len, int flags, struct sockaddr *dst, int destlen);
+   void SendTo(const void* buffer, int len, const SteamNetworkingIdentity &dst);
 
    virtual bool OnLoopPoll(void *cookie);
+
+   //callback for the new ISteamNetworkingMessages api
+   STEAM_CALLBACK(Udp, SteamNetworkingMessagesSessionRequestCallback, SteamNetworkingMessagesSessionRequest_t);
 
 public:
    ~Udp(void);
 
 protected:
    // Network transmission information
-   SOCKET         _socket;
+   ISteamNetworkingMessages* _steamNetMessages;
+   ISteamFriends* _steamFriends;
 
    // state management
    Callbacks      *_callbacks;

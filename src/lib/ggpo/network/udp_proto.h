@@ -63,7 +63,7 @@ public:
    UdpProtocol();
    virtual ~UdpProtocol();
 
-   void Init(Udp *udp, Poll &p, int queue, char *ip, u_short port, UdpMsg::connect_status *status);
+   void Init(Udp *udp, Poll &p, int queue, SteamNetworkingIdentity* id, UdpMsg::connect_status *status);
 
    void Synchronize();
    bool GetPeerConnectStatus(int id, int *frame);
@@ -72,7 +72,7 @@ public:
    bool IsRunning() { return _current_state == Running; }
    void SendInput(GameInput &input);
    void SendInputAck();
-   bool HandlesMsg(sockaddr_in &from, UdpMsg *msg);
+   bool HandlesMsg(SteamNetworkingIdentity& from, UdpMsg *msg);
    void OnMsg(UdpMsg *msg, int len);
    void Disconnect();
   
@@ -94,11 +94,11 @@ protected:
    };
    struct QueueEntry {
       int         queue_time;
-      sockaddr_in dest_addr;
+      SteamNetworkingIdentity dest_id;
       UdpMsg      *msg;
 
       QueueEntry() {}
-      QueueEntry(int time, sockaddr_in &dst, UdpMsg *m) : queue_time(time), dest_addr(dst), msg(m) { }
+      QueueEntry(int time, SteamNetworkingIdentity &dst, UdpMsg *m) : queue_time(time), dest_id(dst), msg(m) { }
    };
 
    bool CreateSocket(int retries);
@@ -127,7 +127,7 @@ protected:
     * Network transmission information
     */
    Udp            *_udp;
-   sockaddr_in    _peer_addr; 
+   SteamNetworkingIdentity    _peer_id;
    uint16         _magic_number;
    int            _queue;
    uint16         _remote_magic_number;
@@ -136,7 +136,7 @@ protected:
    int            _oop_percent;
    struct {
       int         send_time;
-      sockaddr_in dest_addr;
+      SteamNetworkingIdentity dest_id;
       UdpMsg*     msg;
    }              _oo_packet;
    RingBuffer<QueueEntry, 64> _send_queue;

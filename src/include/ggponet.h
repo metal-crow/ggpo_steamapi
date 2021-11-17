@@ -8,6 +8,11 @@
 #ifndef _GGPONET_H_
 #define _GGPONET_H_
 
+#pragma warning( push )
+#pragma warning( disable : 4996 )
+#include "steamnetworkingtypes.h"
+#pragma warning( pop )
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -78,8 +83,7 @@ typedef struct GGPOPlayer {
       struct {
       } local;
       struct {
-         char           ip_address[32];
-         unsigned short port;
+          SteamNetworkingIdentity steamid;
       } remote;
    } u;
 } GGPOPlayer;
@@ -323,8 +327,7 @@ GGPO_API GGPOErrorCode __cdecl ggpo_start_session(GGPOSession **session,
                                                   GGPOSessionCallbacks *cb,
                                                   const char *game,
                                                   int num_players,
-                                                  int input_size,
-                                                  unsigned short localport);
+                                                  int input_size);
 
 
 /*
@@ -404,9 +407,7 @@ GGPO_API GGPOErrorCode __cdecl ggpo_start_spectating(GGPOSession **session,
                                                      const char *game,
                                                      int num_players,
                                                      int input_size,
-                                                     unsigned short local_port,
-                                                     char *host_ip,
-                                                     unsigned short host_port);
+                                                     SteamNetworkingIdentity& host_id);
 
 /*
  * ggpo_close_session --

@@ -9,7 +9,7 @@
 #include "udp_proto.h"
 #include "bitvector.h"
 
-static const int UDP_HEADER_SIZE = 28;     /* Size of IP + UDP headers */
+static const int STEAMPKT_HEADER_SIZE = 28;
 static const int NUM_SYNC_PACKETS = 5;
 static const int SYNC_RETRY_INTERVAL = 2000;
 static const int SYNC_FIRST_RETRY_INTERVAL = 500;
@@ -49,7 +49,7 @@ UdpProtocol::UdpProtocol() :
    for (int i = 0; i < ARRAY_SIZE(_peer_connect_status); i++) {
       _peer_connect_status[i].last_frame = -1;
    }
-   memset(&_peer_addr, 0, sizeof _peer_addr);
+   _peer_id.Clear();
    _oo_packet.msg = NULL;
 
    _send_latency = Platform::GetConfigInt("ggpo.network.delay");
@@ -65,17 +65,14 @@ void
 UdpProtocol::Init(Udp *udp,
                   Poll &poll,
                   int queue,
-                  char *ip,
-                  u_short port,
+                  SteamNetworkingIdentity* id,
                   UdpMsg::connect_status *status)
 {  
    _udp = udp;
    _queue = queue;
    _local_connect_status = status;
 
-   _peer_addr.sin_family = AF_INET;
-   _peer_addr.sin_port = htons(port);
-   inet_pton(AF_INET, ip, &_peer_addr.sin_addr.s_addr);
+   _peer_id = *id;
 
    do {
       _magic_number = (uint16)rand();
@@ -283,19 +280,18 @@ UdpProtocol::SendMsg(UdpMsg *msg)
    msg->hdr.magic = _magic_number;
    msg->hdr.sequence_number = _next_send_seq++;
 
-   _send_queue.push(QueueEntry(Platform::GetCurrentTimeMS(), _peer_addr, msg));
+   _send_queue.push(QueueEntry(Platform::GetCurrentTimeMS(), _peer_id, msg));
    PumpSendQueue();
 }
 
 bool
-UdpProtocol::HandlesMsg(sockaddr_in &from,
+UdpProtocol::HandlesMsg(SteamNetworkingIdentity& from,
                         UdpMsg *msg)
 {
    if (!_udp) {
       return false;
    }
-   return _peer_addr.sin_addr.S_un.S_addr == from.sin_addr.S_un.S_addr &&
-          _peer_addr.sin_port == from.sin_port;
+   return _peer_id == from;
 }
 
 void
@@ -357,10 +353,10 @@ UdpProtocol::UpdateNetworkStats(void)
       _stats_start_time = now;
    }
 
-   int total_bytes_sent = _bytes_sent + (UDP_HEADER_SIZE * _packets_sent);
+   int total_bytes_sent = _bytes_sent + (STEAMPKT_HEADER_SIZE * _packets_sent);
    float seconds = (float)((now - _stats_start_time) / 1000.0);
    float Bps = total_bytes_sent / seconds;
-   float udp_overhead = (float)(100.0 * (UDP_HEADER_SIZE * _packets_sent) / _bytes_sent);
+   float udp_overhead = (float)(100.0 * (STEAMPKT_HEADER_SIZE * _packets_sent) / _bytes_sent);
 
    _kbps_sent = int(Bps / 1024);
 
@@ -730,12 +726,11 @@ UdpProtocol::PumpSendQueue()
          Log("creating rogue oop (seq: %d  delay: %d)\n", entry.msg->hdr.sequence_number, delay);
          _oo_packet.send_time = Platform::GetCurrentTimeMS() + delay;
          _oo_packet.msg = entry.msg;
-         _oo_packet.dest_addr = entry.dest_addr;
+         _oo_packet.dest_id = entry.dest_id;
       } else {
-         ASSERT(entry.dest_addr.sin_addr.s_addr);
+         ASSERT(!entry.dest_id.IsInvalid());
 
-         _udp->SendTo((char *)entry.msg, entry.msg->PacketSize(), 0,
-                      (struct sockaddr *)&entry.dest_addr, sizeof entry.dest_addr);
+         _udp->SendTo((char *)entry.msg, entry.msg->PacketSize(), entry.dest_id);
 
          delete entry.msg;
       }
@@ -743,8 +738,7 @@ UdpProtocol::PumpSendQueue()
    }
    if (_oo_packet.msg && _oo_packet.send_time < Platform::GetCurrentTimeMS()) {
       Log("sending rogue oop!");
-      _udp->SendTo((char *)_oo_packet.msg, _oo_packet.msg->PacketSize(), 0,
-                     (struct sockaddr *)&_oo_packet.dest_addr, sizeof _oo_packet.dest_addr);
+      _udp->SendTo((char *)_oo_packet.msg, _oo_packet.msg->PacketSize(), _oo_packet.dest_id);
 
       delete _oo_packet.msg;
       _oo_packet.msg = NULL;

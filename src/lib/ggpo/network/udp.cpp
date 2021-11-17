@@ -8,105 +8,120 @@
 #include "types.h"
 #include "udp.h"
 
-SOCKET
-CreateSocket(uint16 bind_port, int retries)
-{
-   SOCKET s;
-   sockaddr_in sin;
-   uint16 port;
-   int optval = 1;
-
-   s = socket(AF_INET, SOCK_DGRAM, 0);
-   setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (const char *)&optval, sizeof optval);
-   setsockopt(s, SOL_SOCKET, SO_DONTLINGER, (const char *)&optval, sizeof optval);
-
-   // non-blocking...
-   u_long iMode = 1;
-   ioctlsocket(s, FIONBIO, &iMode);
-
-   sin.sin_family = AF_INET;
-   sin.sin_addr.s_addr = htonl(INADDR_ANY);
-   for (port = bind_port; port <= bind_port + retries; port++) {
-      sin.sin_port = htons(port);
-      if (bind(s, (sockaddr *)&sin, sizeof sin) != SOCKET_ERROR) {
-         Log("Udp bound to port: %d.\n", port);
-         return s;
-      }
-   }
-   closesocket(s);
-   return INVALID_SOCKET;
-}
-
 Udp::Udp() :
-   _socket(INVALID_SOCKET),
+    _steamNetMessages(NULL),
+    _steamFriends(NULL),
    _callbacks(NULL)
 {
 }
 
 Udp::~Udp(void)
 {
-   if (_socket != INVALID_SOCKET) {
-      closesocket(_socket);
-      _socket = INVALID_SOCKET;
-   }
 }
 
-void
-Udp::Init(uint16 port, Poll *poll, Callbacks *callbacks)
+typedef void* gfGetSteamInterface(int iSteamUser, int iUnkInt, const char* pcVersion, const char* pcInterface);
+typedef ISteamClient* gfCreateSteamInterface(const char* pSteamClientVer, uint32_t iUnkZero);
+
+bool
+Udp::Init(Poll *poll, Callbacks *callbacks)
 {
    _callbacks = callbacks;
 
    _poll = poll;
    _poll->RegisterLoop(this);
 
-   Log("binding udp socket to port %d.\n", port);
-   _socket = CreateSocket(port, 0);
+   Log("connecting to steam messages.\n");
+
+   if (!SteamAPI_GetHSteamUser() || !SteamAPI_GetHSteamPipe())
+   {
+       return false;
+   }
+
+   HMODULE hSteamClient64 = GetModuleHandleA("steamclient64.dll");
+   if (!hSteamClient64)
+   {
+       return false;
+   }
+
+   gfCreateSteamInterface* fCreateSteamInterface = (gfCreateSteamInterface*)GetProcAddress(hSteamClient64, "CreateInterface");
+   if (!fCreateSteamInterface)
+   {
+       return false;
+   }
+
+   ISteamClient* SteamClient = fCreateSteamInterface("SteamClient017", 0);
+   if (!SteamClient)
+   {
+       return false;
+   }
+
+   _steamNetMessages = (ISteamNetworkingMessages*)SteamClient->GetISteamGenericInterface(1, 1, STEAMNETWORKINGMESSAGES_INTERFACE_VERSION);
+   if (!_steamNetMessages)
+   {
+       return false;
+   }
+
+   _steamFriends = (ISteamFriends*)SteamClient->GetISteamGenericInterface(1, 1, STEAMFRIENDS_INTERFACE_VERSION);
+   if (!_steamFriends)
+   {
+       return false;
+   }
+
+   return true;
 }
 
 void
-Udp::SendTo(char *buffer, int len, int flags, struct sockaddr *dst, int destlen)
+Udp::SendTo(const void* buffer, int len, const SteamNetworkingIdentity &dst)
 {
-   struct sockaddr_in *to = (struct sockaddr_in *)dst;
-
-   int res = sendto(_socket, buffer, len, flags, dst, destlen);
-   if (res == SOCKET_ERROR) {
-      DWORD err = WSAGetLastError();
-      Log("unknown error in sendto (erro: %d  wsaerr: %d).\n", res, err);
+   int flags = k_nSteamNetworkingSend_AutoRestartBrokenSession | k_nSteamNetworkingSend_UnreliableNoNagle;
+   EResult res = _steamNetMessages->SendMessageToUser(dst, buffer, len, flags, 0);
+   if (res != k_EResultOK) {
+      Log("unknown error in sendto (erro: %d).\n", res);
       ASSERT(FALSE && "Unknown error in sendto");
    }
-   char dst_ip[1024];
-   Log("sent packet length %d to %s:%d (ret:%d).\n", len, inet_ntop(AF_INET, (void *)&to->sin_addr, dst_ip, ARRAY_SIZE(dst_ip)), ntohs(to->sin_port), res);
+   Log("sent packet length %d to %llx (ret:%d).\n", len, dst.GetSteamID64(), res);
 }
 
 bool
 Udp::OnLoopPoll(void *cookie)
 {
-   uint8          recv_buf[MAX_UDP_PACKET_SIZE];
-   sockaddr_in    recv_addr;
-   int            recv_addr_len;
+   SteamNetworkingMessage_t* recv_message[1];
+   SteamNetworkingIdentity recv_id;
+   uint32_t len;
 
    for (;;) {
-      recv_addr_len = sizeof(recv_addr);
-      int len = recvfrom(_socket, (char *)recv_buf, MAX_UDP_PACKET_SIZE, 0, (struct sockaddr *)&recv_addr, &recv_addr_len);
+      int nummsgs = _steamNetMessages->ReceiveMessagesOnChannel(0, recv_message, 1);
 
-      // TODO: handle len == 0... indicates a disconnect.
+      if (nummsgs > 0 && recv_message[0] != nullptr) {
+         len = recv_message[0]->GetSize();
+         recv_id = recv_message[0]->m_identityPeer;
 
-      if (len == -1) {
-         int error = WSAGetLastError();
-         if (error != WSAEWOULDBLOCK) {
-            Log("recvfrom WSAGetLastError returned %d (%x).\n", error, error);
-         }
-         break;
-      } else if (len > 0) {
-         char src_ip[1024];
-         Log("recvfrom returned (len:%d  from:%s:%d).\n", len, inet_ntop(AF_INET, (void*)&recv_addr.sin_addr, src_ip, ARRAY_SIZE(src_ip)), ntohs(recv_addr.sin_port) );
-         UdpMsg *msg = (UdpMsg *)recv_buf;
-         _callbacks->OnMsg(recv_addr, msg, len);
+         Log("recvfrom returned (len:%d  from:%llx).\n", len, recv_id.GetSteamID64());
+
+         UdpMsg *msg = (UdpMsg *)recv_message[0]->GetData();
+         _callbacks->OnMsg(recv_id, msg, len);
+
+         recv_message[0]->Release();
+         recv_message[0] = NULL;
       } 
    }
-   return true;
 }
 
+//Add a new callback for the NetMessages equivalent of AcceptP2PSessionWithUser
+void Udp::SteamNetworkingMessagesSessionRequestCallback(SteamNetworkingMessagesSessionRequest_t* pCallback)
+{
+    CSteamID user = pCallback->m_identityRemote.GetSteamID();
+
+    //Check they're not blocked
+    EFriendRelationship relation = _steamFriends->GetFriendRelationship(user);
+    if (relation == EFriendRelationship::k_EFriendRelationshipIgnored)
+    {
+        return;
+    }
+
+    bool out = _steamNetMessages->AcceptSessionWithUser(pCallback->m_identityRemote);
+    Log("SteamNetworkingMessagesSessionRequestCallback accepted user. %d\n", out);
+}
 
 void
 Udp::Log(const char *fmt, ...)

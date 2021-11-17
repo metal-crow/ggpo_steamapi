@@ -39,7 +39,7 @@ typedef unsigned char uint8;
 #endif
 
 typedef unsigned char uint8;
-typedef signed char int8;
+//typedef signed char int8;
 
 #if defined( _WIN32 ) && !defined( __GNUC__ )
 

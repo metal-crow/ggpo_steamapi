@@ -40,12 +40,10 @@ ggpo_start_session(GGPOSession **session,
                    GGPOSessionCallbacks *cb,
                    const char *game,
                    int num_players,
-                   int input_size,
-                   unsigned short localport)
+                   int input_size)
 {
    *session= (GGPOSession *)new Peer2PeerBackend(cb,
                                                  game,
-                                                 localport,
                                                  num_players,
                                                  input_size);
    return GGPO_OK;
@@ -192,17 +190,13 @@ GGPOErrorCode ggpo_start_spectating(GGPOSession **session,
                                     const char *game,
                                     int num_players,
                                     int input_size,
-                                    unsigned short local_port,
-                                    char *host_ip,
-                                    unsigned short host_port)
+                                    SteamNetworkingIdentity& host_id)
 {
    *session= (GGPOSession *)new SpectatorBackend(cb,
                                                  game,
-                                                 local_port,
                                                  num_players,
                                                  input_size,
-                                                 host_ip,
-                                                 host_port);
+                                                 host_id);
    return GGPO_OK;
 }
 
