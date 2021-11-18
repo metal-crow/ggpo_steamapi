@@ -44,16 +44,12 @@ public:
 
    virtual bool OnLoopPoll(void *cookie);
 
-   //callback for the new ISteamNetworkingMessages api
-   STEAM_CALLBACK(Udp, SteamNetworkingMessagesSessionRequestCallback, SteamNetworkingMessagesSessionRequest_t);
-
 public:
    ~Udp(void);
 
 protected:
    // Network transmission information
    ISteamNetworkingMessages* _steamNetMessages;
-   ISteamFriends* _steamFriends;
 
    // state management
    Callbacks      *_callbacks;

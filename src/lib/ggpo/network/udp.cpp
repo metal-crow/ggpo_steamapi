@@ -61,12 +61,6 @@ Udp::Init(Poll *poll, Callbacks *callbacks)
        return false;
    }
 
-   _steamFriends = (ISteamFriends*)SteamClient->GetISteamGenericInterface(1, 1, STEAMFRIENDS_INTERFACE_VERSION);
-   if (!_steamFriends)
-   {
-       return false;
-   }
-
    return true;
 }
 
@@ -74,7 +68,7 @@ void
 Udp::SendTo(const void* buffer, int len, const SteamNetworkingIdentity &dst)
 {
    int flags = k_nSteamNetworkingSend_AutoRestartBrokenSession | k_nSteamNetworkingSend_UnreliableNoNagle;
-   EResult res = _steamNetMessages->SendMessageToUser(dst, buffer, len, flags, 0);
+   EResult res = _steamNetMessages->SendMessageToUser(dst, buffer, len, flags, 1);
    if (res != k_EResultOK) {
       Log("unknown error in sendto (erro: %d).\n", res);
       ASSERT(FALSE && "Unknown error in sendto");
@@ -90,7 +84,7 @@ Udp::OnLoopPoll(void *cookie)
    uint32_t len;
 
    for (;;) {
-      int nummsgs = _steamNetMessages->ReceiveMessagesOnChannel(0, recv_message, 1);
+      int nummsgs = _steamNetMessages->ReceiveMessagesOnChannel(1, recv_message, 1);
 
       if (nummsgs > 0 && recv_message[0] != nullptr) {
          len = recv_message[0]->GetSize();
@@ -105,22 +99,6 @@ Udp::OnLoopPoll(void *cookie)
          recv_message[0] = NULL;
       } 
    }
-}
-
-//Add a new callback for the NetMessages equivalent of AcceptP2PSessionWithUser
-void Udp::SteamNetworkingMessagesSessionRequestCallback(SteamNetworkingMessagesSessionRequest_t* pCallback)
-{
-    CSteamID user = pCallback->m_identityRemote.GetSteamID();
-
-    //Check they're not blocked
-    EFriendRelationship relation = _steamFriends->GetFriendRelationship(user);
-    if (relation == EFriendRelationship::k_EFriendRelationshipIgnored)
-    {
-        return;
-    }
-
-    bool out = _steamNetMessages->AcceptSessionWithUser(pCallback->m_identityRemote);
-    Log("SteamNetworkingMessagesSessionRequestCallback accepted user. %d\n", out);
 }
 
 void
