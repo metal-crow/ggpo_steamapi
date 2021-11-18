@@ -19,7 +19,7 @@
 
 class SpectatorBackend : public IQuarkBackend, IPollSink, Udp::Callbacks {
 public:
-   SpectatorBackend(GGPOSessionCallbacks *cb, const char *gamename, int num_players, int input_size, SteamNetworkingIdentity& hostid);
+   SpectatorBackend(GGPOSessionCallbacks *cb, ISteamNetworkingMessages* steamNetMessages, const char *gamename, int num_players, int input_size, SteamNetworkingIdentity& hostid);
    virtual ~SpectatorBackend();
 
 

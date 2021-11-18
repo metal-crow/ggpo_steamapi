@@ -21,46 +21,15 @@ Udp::~Udp(void)
 typedef void* gfGetSteamInterface(int iSteamUser, int iUnkInt, const char* pcVersion, const char* pcInterface);
 typedef ISteamClient* gfCreateSteamInterface(const char* pSteamClientVer, uint32_t iUnkZero);
 
-bool
-Udp::Init(Poll *poll, Callbacks *callbacks)
+void
+Udp::Init(ISteamNetworkingMessages* steamNetMessages, Poll *poll, Callbacks *callbacks)
 {
    _callbacks = callbacks;
 
    _poll = poll;
    _poll->RegisterLoop(this);
 
-   Log("connecting to steam messages.\n");
-
-   if (!SteamAPI_GetHSteamUser() || !SteamAPI_GetHSteamPipe())
-   {
-       return false;
-   }
-
-   HMODULE hSteamClient64 = GetModuleHandleA("steamclient64.dll");
-   if (!hSteamClient64)
-   {
-       return false;
-   }
-
-   gfCreateSteamInterface* fCreateSteamInterface = (gfCreateSteamInterface*)GetProcAddress(hSteamClient64, "CreateInterface");
-   if (!fCreateSteamInterface)
-   {
-       return false;
-   }
-
-   ISteamClient* SteamClient = fCreateSteamInterface("SteamClient017", 0);
-   if (!SteamClient)
-   {
-       return false;
-   }
-
-   _steamNetMessages = (ISteamNetworkingMessages*)SteamClient->GetISteamGenericInterface(1, 1, STEAMNETWORKINGMESSAGES_INTERFACE_VERSION);
-   if (!_steamNetMessages)
-   {
-       return false;
-   }
-
-   return true;
+   _steamNetMessages = steamNetMessages;
 }
 
 void

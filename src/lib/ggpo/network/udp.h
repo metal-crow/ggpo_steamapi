@@ -38,7 +38,7 @@ protected:
 public:
    Udp();
 
-   bool Init(Poll *p, Callbacks *callbacks);
+   void Init(ISteamNetworkingMessages* steamNetMessages, Poll *p, Callbacks *callbacks);
    
    void SendTo(const void* buffer, int len, const SteamNetworkingIdentity &dst);
 

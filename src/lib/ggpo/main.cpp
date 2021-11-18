@@ -38,11 +38,13 @@ ggpo_logv(GGPOSession *ggpo, const char *fmt, va_list args)
 GGPOErrorCode
 ggpo_start_session(GGPOSession **session,
                    GGPOSessionCallbacks *cb,
+                   ISteamNetworkingMessages* steamNetMessages,
                    const char *game,
                    int num_players,
                    int input_size)
 {
    *session= (GGPOSession *)new Peer2PeerBackend(cb,
+                                                 steamNetMessages,
                                                  game,
                                                  num_players,
                                                  input_size);
@@ -187,12 +189,14 @@ ggpo_set_disconnect_notify_start(GGPOSession *ggpo, int timeout)
 
 GGPOErrorCode ggpo_start_spectating(GGPOSession **session,
                                     GGPOSessionCallbacks *cb,
+                                    ISteamNetworkingMessages* steamNetMessages,
                                     const char *game,
                                     int num_players,
                                     int input_size,
                                     SteamNetworkingIdentity& host_id)
 {
    *session= (GGPOSession *)new SpectatorBackend(cb,
+                                                 steamNetMessages,
                                                  game,
                                                  num_players,
                                                  input_size,

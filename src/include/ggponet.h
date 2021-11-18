@@ -10,7 +10,7 @@
 
 #pragma warning( push )
 #pragma warning( disable : 4996 )
-#include "steamnetworkingtypes.h"
+#include "steam_api.h"
 #pragma warning( pop )
 
 #ifdef __cplusplus
@@ -325,6 +325,7 @@ typedef struct GGPONetworkStats {
  */
 GGPO_API GGPOErrorCode __cdecl ggpo_start_session(GGPOSession **session,
                                                   GGPOSessionCallbacks *cb,
+                                                  ISteamNetworkingMessages* steamNetMessages,
                                                   const char *game,
                                                   int num_players,
                                                   int input_size);
@@ -404,6 +405,7 @@ GGPO_API GGPOErrorCode __cdecl ggpo_start_synctest(GGPOSession **session,
  */
 GGPO_API GGPOErrorCode __cdecl ggpo_start_spectating(GGPOSession **session,
                                                      GGPOSessionCallbacks *cb,
+                                                     ISteamNetworkingMessages* steamNetMessages,
                                                      const char *game,
                                                      int num_players,
                                                      int input_size,

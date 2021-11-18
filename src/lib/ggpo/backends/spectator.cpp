@@ -8,6 +8,7 @@
 #include "spectator.h"
 
 SpectatorBackend::SpectatorBackend(GGPOSessionCallbacks *cb,
+                                   ISteamNetworkingMessages* steamNetMessages,
                                    const char* gamename,
                                    int num_players,
                                    int input_size,
@@ -26,7 +27,7 @@ SpectatorBackend::SpectatorBackend(GGPOSessionCallbacks *cb,
    /*
     * Initialize the UDP port
     */
-   _udp.Init(&_poll, this);
+   _udp.Init(steamNetMessages, &_poll, this);
 
    /*
     * Init the host endpoint
