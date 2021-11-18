@@ -10,7 +10,6 @@
 
 Udp::Udp() :
     _steamNetMessages(NULL),
-    _steamFriends(NULL),
    _callbacks(NULL)
 {
 }
