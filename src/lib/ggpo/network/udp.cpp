@@ -65,8 +65,13 @@ Udp::OnLoopPoll(void *cookie)
 
          recv_message[0]->Release();
          recv_message[0] = NULL;
-      } 
+      }
+      else
+      {
+          break;
+      }
    }
+   return true;
 }
 
 void

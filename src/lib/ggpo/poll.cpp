@@ -68,7 +68,7 @@ Poll::Pump(int timeout)
       timeout = MIN(timeout, maxwait);
    }
 
-   res = WaitForMultipleObjects(_handle_count, _handles, false, timeout);
+   res = WaitForMultipleObjects(_handle_count, _handles, false, 0);
    if (res >= WAIT_OBJECT_0 && res < WAIT_OBJECT_0 + _handle_count) {
       i = res - WAIT_OBJECT_0;
       finished = !_handle_sinks[i].sink->OnHandlePoll(_handle_sinks[i].cookie) || finished;
