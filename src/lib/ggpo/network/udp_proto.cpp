@@ -150,6 +150,10 @@ UdpProtocol::SendPendingOutput()
       memset(msg->u.input.peer_connect_status, 0, sizeof(UdpMsg::connect_status) * UDP_MSG_MAX_PLAYERS);
    }
 
+   if (offset >= MAX_COMPRESSED_BITS)
+   {
+       Log("offset = %d\n", offset);
+   }
    ASSERT(offset < MAX_COMPRESSED_BITS);
 
    SendMsg(msg);
