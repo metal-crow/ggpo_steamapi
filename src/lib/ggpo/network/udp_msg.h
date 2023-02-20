@@ -10,6 +10,8 @@
 
 #include "game_input.h"
 
+//want GAMEINPUT_MAX_BYTES*UDP_MSG_MAX_FRAMES + rest of the input struct size to be < the steam max packet size (1400)
+#define UDP_MSG_MAX_FRAMES           4
 #define UDP_MSG_MAX_PLAYERS          6
 
 #pragma pack(push, 1)
@@ -60,13 +62,14 @@ struct UdpMsg
       struct {
          connect_status    peer_connect_status[UDP_MSG_MAX_PLAYERS];
 
-         uint32            frame;
+         uint32            start_frame;
 
          int               disconnect_requested:1;
          int               ack_frame:31;
 
          uint16            size; // this is used by PayloadSize() to prevent us from sending more data then needed
-         uint8             bits[GAMEINPUT_MAX_BYTES]; /* must be last */
+         uint16            input_size; // XXX: shouldn't be in every single packet!
+         uint8             bits[GAMEINPUT_MAX_BYTES*UDP_MSG_MAX_FRAMES]; /* must be last */
       } input;
 
       struct {

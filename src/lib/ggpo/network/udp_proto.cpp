@@ -109,7 +109,7 @@ UdpProtocol::SendPendingOutput()
     if (_pending_output.size() == 0)
     {
         UdpMsg* empty_msg = new UdpMsg(UdpMsg::Input);
-        empty_msg->u.input.frame = 0;
+        empty_msg->u.input.start_frame = 0;
         empty_msg->u.input.ack_frame = _last_received_input.frame;
         empty_msg->u.input.disconnect_requested = _current_state == Disconnected;
         if (_local_connect_status)
@@ -121,32 +121,49 @@ UdpProtocol::SendPendingOutput()
             memset(empty_msg->u.input.peer_connect_status, 0, sizeof(UdpMsg::connect_status) * UDP_MSG_MAX_PLAYERS);
         }
         empty_msg->u.input.size = 0;
+        empty_msg->u.input.input_size = 0;
         SendMsg(empty_msg);
         return;
     }
 
     ASSERT(_last_acked_input.frame == -1 || _last_acked_input.frame + 1 == _pending_output.item(0).frame);
-    for (int j = 0; j < _pending_output.size(); j++)
+
+    size_t pending_output_i = 0;
+    while(pending_output_i < (size_t)_pending_output.size())
     {
         UdpMsg* msg = new UdpMsg(UdpMsg::Input);
-        GameInput& current = _pending_output.item(j);
+        msg->u.input.size = 0;
 
-        if (_local_connect_status)
+        //pack in multiple frames into this msg
+        size_t j = 0;
+        while(j < min(UDP_MSG_MAX_FRAMES, ((size_t)_pending_output.size() - pending_output_i)))
         {
-            memcpy(msg->u.input.peer_connect_status, _local_connect_status, sizeof(UdpMsg::connect_status) * UDP_MSG_MAX_PLAYERS);
-        }
-        else
-        {
-            memset(msg->u.input.peer_connect_status, 0, sizeof(UdpMsg::connect_status) * UDP_MSG_MAX_PLAYERS);
-        }
-        msg->u.input.frame = current.frame;
-        msg->u.input.disconnect_requested = _current_state == Disconnected;
-        msg->u.input.ack_frame = _last_received_input.frame;
-        ASSERT(current.size <= GAMEINPUT_MAX_BYTES);
-        msg->u.input.size = (uint16)current.size;
-        memcpy(msg->u.input.bits, current.bits, current.size); //this is only going to be the local player's inputs
+            GameInput& current = _pending_output.item((int)(pending_output_i+j));
 
-        _last_sent_input = current;
+            if (j == 0)
+            {
+                if (_local_connect_status)
+                {
+                    memcpy(msg->u.input.peer_connect_status, _local_connect_status, sizeof(UdpMsg::connect_status) * UDP_MSG_MAX_PLAYERS);
+                }
+                else
+                {
+                    memset(msg->u.input.peer_connect_status, 0, sizeof(UdpMsg::connect_status) * UDP_MSG_MAX_PLAYERS);
+                }
+                msg->u.input.start_frame = current.frame;
+                msg->u.input.disconnect_requested = _current_state == Disconnected;
+                msg->u.input.ack_frame = _last_received_input.frame;
+                msg->u.input.input_size = (uint16)current.size;
+            }
+            ASSERT(current.size <= GAMEINPUT_MAX_BYTES);
+            msg->u.input.size += GAMEINPUT_MAX_BYTES;
+            memcpy(msg->u.input.bits+(GAMEINPUT_MAX_BYTES*j), current.bits, current.size); //this is only going to be the local player's inputs
+
+            _last_sent_input = current;
+
+            j++;
+        }
+        pending_output_i += j;
 
         SendMsg(msg);
     }
@@ -429,7 +446,7 @@ UdpProtocol::LogMsg(const char *prefix, UdpMsg *msg)
       Log("%s keep alive.\n", prefix);
       break;
    case UdpMsg::Input:
-      Log("%s game-input frame=%d.\n", prefix, msg->u.input.frame);
+      Log("%s game-input frame=%d.\n", prefix, msg->u.input.start_frame);
       break;
    case UdpMsg::InputAck:
       Log("%s input ack.\n", prefix);
@@ -537,44 +554,60 @@ UdpProtocol::OnInput(UdpMsg *msg, int len)
     */
    int last_received_frame_number = _last_received_input.frame;
    if (msg->u.input.size > 0) {
-      int currentFrame = msg->u.input.frame;
+      int currentFrame = msg->u.input.start_frame;
 
-      _last_received_input.size = msg->u.input.size;
+      _last_received_input.size = msg->u.input.input_size;
       if (_last_received_input.frame < 0) {
-         _last_received_input.frame = msg->u.input.frame - 1;
+         _last_received_input.frame = msg->u.input.start_frame - 1;
       }
-      ASSERT(currentFrame <= (_last_received_input.frame + 1));
-      bool useInputs = currentFrame == _last_received_input.frame + 1;
 
-      memcpy(_last_received_input.bits, msg->u.input.bits, msg->u.input.size);
+      for (size_t frame_i = 0; frame_i < msg->u.input.size / GAMEINPUT_MAX_BYTES; frame_i++)
+      {
+          /*
+           * Keep walking through the frames (parsing bits) until we reach
+           * the inputs for the frame right after the one we're on.
+           */
+          ASSERT(currentFrame <= (_last_received_input.frame + 1));
+          bool useInputs = currentFrame == _last_received_input.frame + 1;
 
-      /*
-       * Now if we want to use these inputs, go ahead and send them to
-       * the emulator.
-       */
-      if (useInputs) {
-         /*
-          * Move forward 1 frame in the stream.
-          */
-         char desc[1024];
-         ASSERT(currentFrame == _last_received_input.frame + 1);
-         _last_received_input.frame = currentFrame;
+          memcpy(_last_received_input.bits, msg->u.input.bits + (GAMEINPUT_MAX_BYTES*frame_i), GAMEINPUT_MAX_BYTES);
 
-         /*
-          * Send the event to the emualtor
-          */
-         UdpProtocol::Event evt(UdpProtocol::Event::Input);
-         evt.u.input.input = _last_received_input;
+          /*
+           * Now if we want to use these inputs, go ahead and send them to
+           * the emulator.
+           */
+          if (useInputs)
+          {
+              /*
+               * Move forward 1 frame in the stream.
+               */
+              char desc[1024];
+              ASSERT(currentFrame == _last_received_input.frame + 1);
+              _last_received_input.frame = currentFrame;
 
-         _last_received_input.desc(desc, ARRAY_SIZE(desc));
+              /*
+               * Send the event to the emualtor
+               */
+              UdpProtocol::Event evt(UdpProtocol::Event::Input);
+              evt.u.input.input = _last_received_input;
 
-         _state.running.last_input_packet_recv_time = Platform::GetCurrentTimeMS();
+              _last_received_input.desc(desc, ARRAY_SIZE(desc));
 
-         Log("Sending frame %d to emu queue %d (%s).\n", _last_received_input.frame, _queue, desc);
-         QueueEvent(evt);
+              _state.running.last_input_packet_recv_time = Platform::GetCurrentTimeMS();
 
-      } else {
-         Log("Skipping past frame:(%d) current is %d.\n", currentFrame, _last_received_input.frame);
+              Log("Sending frame %d to emu queue %d (%s).\n", _last_received_input.frame, _queue, desc);
+              QueueEvent(evt);
+
+          }
+          else
+          {
+              Log("Skipping past frame:(%d) current is %d.\n", currentFrame, _last_received_input.frame);
+          }
+
+          /*
+           * Move forward 1 frame in the input stream.
+           */
+          currentFrame++;
       }
    }
    ASSERT(_last_received_input.frame >= last_received_frame_number);

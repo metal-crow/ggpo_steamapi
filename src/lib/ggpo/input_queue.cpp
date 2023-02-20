@@ -218,8 +218,6 @@ InputQueue::AddDelayedInputToQueue(GameInput &input, int frame_number)
 {
    Log("adding delayed input frame number %d to queue.\n", frame_number);
 
-   ASSERT(input.size == _prediction.size);
-
    ASSERT(_last_added_frame == GameInput::NullFrame || frame_number == _last_added_frame + 1);
 
    ASSERT(frame_number == 0 || _inputs[PREVIOUS_FRAME(_head)].frame == frame_number - 1);
