@@ -156,8 +156,8 @@ UdpProtocol::SendPendingOutput()
                 msg->u.input.input_size = (uint16)current.size;
             }
             ASSERT(current.size <= GAMEINPUT_MAX_BYTES);
-            msg->u.input.size += GAMEINPUT_MAX_BYTES;
-            memcpy(msg->u.input.bits+(GAMEINPUT_MAX_BYTES*j), current.bits, current.size); //this is only going to be the local player's inputs
+            msg->u.input.size += (uint16)current.size;
+            memcpy(msg->u.input.bits+(current.size*j), current.bits, current.size); //this is only going to be the local player's inputs
 
             _last_sent_input = current;
 
@@ -561,7 +561,7 @@ UdpProtocol::OnInput(UdpMsg *msg, int len)
          _last_received_input.frame = msg->u.input.start_frame - 1;
       }
 
-      for (size_t frame_i = 0; frame_i < msg->u.input.size / GAMEINPUT_MAX_BYTES; frame_i++)
+      for (size_t frame_i = 0; frame_i < msg->u.input.size / msg->u.input.input_size; frame_i++)
       {
           /*
            * Keep walking through the frames (parsing bits) until we reach
@@ -570,7 +570,7 @@ UdpProtocol::OnInput(UdpMsg *msg, int len)
           ASSERT(currentFrame <= (_last_received_input.frame + 1));
           bool useInputs = currentFrame == _last_received_input.frame + 1;
 
-          memcpy(_last_received_input.bits, msg->u.input.bits + (GAMEINPUT_MAX_BYTES*frame_i), GAMEINPUT_MAX_BYTES);
+          memcpy(_last_received_input.bits, msg->u.input.bits + (msg->u.input.input_size*frame_i), msg->u.input.input_size);
 
           /*
            * Now if we want to use these inputs, go ahead and send them to
