@@ -32,7 +32,7 @@ void Logv(const char *fmt, va_list args)
       return;
    }
    if (!logfile) {
-      sprintf_s(logbuf, ARRAY_SIZE(logbuf), "log-%d.log", Platform::GetProcessID());
+      sprintf_s(logbuf, ARRAY_SIZE(logbuf), "ggpo-log.log");
       fopen_s(&logfile, logbuf, "w");
    }
    Logv(logfile, fmt, args);
