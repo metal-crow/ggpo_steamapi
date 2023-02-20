@@ -46,14 +46,6 @@ GameInput::desc(char *buf, size_t buf_size, bool show_frame) const
       remaining -= sprintf_s(buf, buf_size, "(size:%d ", size);
    }
 
-   for (int i = 0; i < size * 8; i++) {
-      char buf2[16];
-      if (value(i)) {
-         int c = sprintf_s(buf2, ARRAY_SIZE(buf2), "%2d ", i);
-         strncat_s(buf, remaining, buf2, ARRAY_SIZE(buf2));
-         remaining -= c;
-      }
-   }
    strncat_s(buf, remaining, ")", 1);
 }
 

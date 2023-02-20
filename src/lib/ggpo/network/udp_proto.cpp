@@ -7,7 +7,6 @@
 
 #include "types.h"
 #include "udp_proto.h"
-#include "bitvector.h"
 
 static const int STEAMPKT_HEADER_SIZE = 28;
 static const int NUM_SYNC_PACKETS = 5;
@@ -107,56 +106,50 @@ UdpProtocol::SendInput(GameInput &input)
 void
 UdpProtocol::SendPendingOutput()
 {
-   UdpMsg *msg = new UdpMsg(UdpMsg::Input);
-   int i, j, offset = 0;
-   uint8 *bits;
-   GameInput last;
+    if (_pending_output.size() == 0)
+    {
+        UdpMsg* empty_msg = new UdpMsg(UdpMsg::Input);
+        empty_msg->u.input.frame = 0;
+        empty_msg->u.input.ack_frame = _last_received_input.frame;
+        empty_msg->u.input.disconnect_requested = _current_state == Disconnected;
+        if (_local_connect_status)
+        {
+            memcpy(empty_msg->u.input.peer_connect_status, _local_connect_status, sizeof(UdpMsg::connect_status) * UDP_MSG_MAX_PLAYERS);
+        }
+        else
+        {
+            memset(empty_msg->u.input.peer_connect_status, 0, sizeof(UdpMsg::connect_status) * UDP_MSG_MAX_PLAYERS);
+        }
+        empty_msg->u.input.size = 0;
+        SendMsg(empty_msg);
+        return;
+    }
 
-   if (_pending_output.size()) {
-      last = _last_acked_input;
-      bits = msg->u.input.bits;
+    ASSERT(_last_acked_input.frame == -1 || _last_acked_input.frame + 1 == _pending_output.item(0).frame);
+    for (int j = 0; j < _pending_output.size(); j++)
+    {
+        UdpMsg* msg = new UdpMsg(UdpMsg::Input);
+        GameInput& current = _pending_output.item(j);
 
-      msg->u.input.start_frame = _pending_output.front().frame;
-      msg->u.input.input_size = (uint8)_pending_output.front().size;
+        if (_local_connect_status)
+        {
+            memcpy(msg->u.input.peer_connect_status, _local_connect_status, sizeof(UdpMsg::connect_status) * UDP_MSG_MAX_PLAYERS);
+        }
+        else
+        {
+            memset(msg->u.input.peer_connect_status, 0, sizeof(UdpMsg::connect_status) * UDP_MSG_MAX_PLAYERS);
+        }
+        msg->u.input.frame = current.frame;
+        msg->u.input.disconnect_requested = _current_state == Disconnected;
+        msg->u.input.ack_frame = _last_received_input.frame;
+        ASSERT(current.size <= GAMEINPUT_MAX_BYTES);
+        msg->u.input.size = (uint16)current.size;
+        memcpy(msg->u.input.bits, current.bits, current.size); //this is only going to be the local player's inputs
 
-      ASSERT(last.frame == -1 || last.frame + 1 == msg->u.input.start_frame);
-      for (j = 0; j < _pending_output.size(); j++) {
-         GameInput &current = _pending_output.item(j);
-         if (memcmp(current.bits, last.bits, current.size) != 0) {
-            ASSERT((GAMEINPUT_MAX_BYTES * GAMEINPUT_MAX_PLAYERS * 8) < (1 << BITVECTOR_NIBBLE_SIZE));
-            for (i = 0; i < current.size * 8; i++) {
-               ASSERT(i < (1 << BITVECTOR_NIBBLE_SIZE));
-               if (current.value(i) != last.value(i)) {
-                  BitVector_SetBit(msg->u.input.bits, &offset);
-                  (current.value(i) ? BitVector_SetBit : BitVector_ClearBit)(bits, &offset);
-                  BitVector_WriteNibblet(bits, i, &offset);
-               }
-            }
-         }
-         BitVector_ClearBit(msg->u.input.bits, &offset);
-         last = _last_sent_input = current;
-      }
-   } else {
-      msg->u.input.start_frame = 0;
-      msg->u.input.input_size = 0;
-   }
-   msg->u.input.ack_frame = _last_received_input.frame;
-   msg->u.input.num_bits = (uint16)offset;
+        _last_sent_input = current;
 
-   msg->u.input.disconnect_requested = _current_state == Disconnected;
-   if (_local_connect_status) {
-      memcpy(msg->u.input.peer_connect_status, _local_connect_status, sizeof(UdpMsg::connect_status) * UDP_MSG_MAX_PLAYERS);
-   } else {
-      memset(msg->u.input.peer_connect_status, 0, sizeof(UdpMsg::connect_status) * UDP_MSG_MAX_PLAYERS);
-   }
-
-   if (offset >= MAX_COMPRESSED_BITS)
-   {
-       Log("offset = %d\n", offset);
-   }
-   ASSERT(offset < MAX_COMPRESSED_BITS);
-
-   SendMsg(msg);
+        SendMsg(msg);
+    }
 }
 
 void
@@ -436,7 +429,7 @@ UdpProtocol::LogMsg(const char *prefix, UdpMsg *msg)
       Log("%s keep alive.\n", prefix);
       break;
    case UdpMsg::Input:
-      Log("%s game-compressed-input %d (+ %d bits).\n", prefix, msg->u.input.start_frame, msg->u.input.num_bits);
+      Log("%s game-input frame=%d.\n", prefix, msg->u.input.frame);
       break;
    case UdpMsg::InputAck:
       Log("%s input ack.\n", prefix);
@@ -540,73 +533,48 @@ UdpProtocol::OnInput(UdpMsg *msg, int len)
    }
 
    /*
-    * Decompress the input.
+    * Read the input.
     */
    int last_received_frame_number = _last_received_input.frame;
-   if (msg->u.input.num_bits) {
-      int offset = 0;
-      uint8 *bits = (uint8 *)msg->u.input.bits;
-      int numBits = msg->u.input.num_bits;
-      int currentFrame = msg->u.input.start_frame;
+   if (msg->u.input.size > 0) {
+      int currentFrame = msg->u.input.frame;
 
-      _last_received_input.size = msg->u.input.input_size;
+      _last_received_input.size = msg->u.input.size;
       if (_last_received_input.frame < 0) {
-         _last_received_input.frame = msg->u.input.start_frame - 1;
+         _last_received_input.frame = msg->u.input.frame - 1;
       }
-      while (offset < numBits) {
-         /*
-          * Keep walking through the frames (parsing bits) until we reach
-          * the inputs for the frame right after the one we're on.
-          */
-         ASSERT(currentFrame <= (_last_received_input.frame + 1));
-         bool useInputs = currentFrame == _last_received_input.frame + 1;
+      ASSERT(currentFrame <= (_last_received_input.frame + 1));
+      bool useInputs = currentFrame == _last_received_input.frame + 1;
 
-         while (BitVector_ReadBit(bits, &offset)) {
-            int on = BitVector_ReadBit(bits, &offset);
-            int button = BitVector_ReadNibblet(bits, &offset);
-            if (useInputs) {
-               if (on) {
-                  _last_received_input.set(button);
-               } else {
-                  _last_received_input.clear(button);
-               }
-            }
-         }
-         ASSERT(offset <= numBits);
+      memcpy(_last_received_input.bits, msg->u.input.bits, msg->u.input.size);
+
+      /*
+       * Now if we want to use these inputs, go ahead and send them to
+       * the emulator.
+       */
+      if (useInputs) {
+         /*
+          * Move forward 1 frame in the stream.
+          */
+         char desc[1024];
+         ASSERT(currentFrame == _last_received_input.frame + 1);
+         _last_received_input.frame = currentFrame;
 
          /*
-          * Now if we want to use these inputs, go ahead and send them to
-          * the emulator.
+          * Send the event to the emualtor
           */
-         if (useInputs) {
-            /*
-             * Move forward 1 frame in the stream.
-             */
-            char desc[1024];
-            ASSERT(currentFrame == _last_received_input.frame + 1);
-            _last_received_input.frame = currentFrame;
+         UdpProtocol::Event evt(UdpProtocol::Event::Input);
+         evt.u.input.input = _last_received_input;
 
-            /*
-             * Send the event to the emualtor
-             */
-            UdpProtocol::Event evt(UdpProtocol::Event::Input);
-            evt.u.input.input = _last_received_input;
+         _last_received_input.desc(desc, ARRAY_SIZE(desc));
 
-            _last_received_input.desc(desc, ARRAY_SIZE(desc));
+         _state.running.last_input_packet_recv_time = Platform::GetCurrentTimeMS();
 
-            _state.running.last_input_packet_recv_time = Platform::GetCurrentTimeMS();
+         Log("Sending frame %d to emu queue %d (%s).\n", _last_received_input.frame, _queue, desc);
+         QueueEvent(evt);
 
-            Log("Sending frame %d to emu queue %d (%s).\n", _last_received_input.frame, _queue, desc);
-            QueueEvent(evt);
-
-         } else {
-            Log("Skipping past frame:(%d) current is %d.\n", currentFrame, _last_received_input.frame);
-         }
-
-         /*
-          * Move forward 1 frame in the input stream.
-          */
-         currentFrame++;
+      } else {
+         Log("Skipping past frame:(%d) current is %d.\n", currentFrame, _last_received_input.frame);
       }
    }
    ASSERT(_last_received_input.frame >= last_received_frame_number);

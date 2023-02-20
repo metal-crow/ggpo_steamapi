@@ -8,7 +8,8 @@
 #ifndef _UDP_MSG_H
 #define _UDP_MSG_H
 
-#define MAX_COMPRESSED_BITS       18000
+#include "game_input.h"
+
 #define UDP_MSG_MAX_PLAYERS          6
 
 #pragma pack(push, 1)
@@ -59,14 +60,13 @@ struct UdpMsg
       struct {
          connect_status    peer_connect_status[UDP_MSG_MAX_PLAYERS];
 
-         uint32            start_frame;
+         uint32            frame;
 
          int               disconnect_requested:1;
          int               ack_frame:31;
 
-         uint16            num_bits;
-         uint8             input_size; // XXX: shouldn't be in every single packet!
-         uint8             bits[MAX_COMPRESSED_BITS]; /* must be last */
+         uint16            size; // this is used by PayloadSize() to prevent us from sending more data then needed
+         uint8             bits[GAMEINPUT_MAX_BYTES]; /* must be last */
       } input;
 
       struct {
@@ -81,7 +81,7 @@ public:
    }
 
    int PayloadSize() {
-      int size;
+       int size;
 
       switch (hdr.type) {
       case SyncRequest:   return sizeof(u.sync_request);
@@ -91,9 +91,9 @@ public:
       case InputAck:      return sizeof(u.input_ack);
       case KeepAlive:     return 0;
       case Input:
-         size = (int)((char *)&u.input.bits - (char *)&u.input);
-         size += (u.input.num_bits + 7) / 8;
-         return size;
+          size = (int)((char*)&u.input.bits - (char*)&u.input);
+          size += u.input.size;
+          return size;
       }
       ASSERT(false);
       return 0;
