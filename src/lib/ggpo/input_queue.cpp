@@ -10,9 +10,8 @@
 
 #define PREVIOUS_FRAME(offset)   (((offset) == 0) ? (INPUT_QUEUE_LENGTH - 1) : ((offset) - 1))
 
-InputQueue::InputQueue(int input_size)
+InputQueue::InputQueue()
 {
-   Init(-1, input_size);
 }
 
 InputQueue::~InputQueue()
@@ -20,7 +19,7 @@ InputQueue::~InputQueue()
 }
 
 void
-InputQueue::Init(int id, int input_size)
+InputQueue::Init(int id, int input_size, GGPOSessionCallbacks& callbacks)
 {
    _id = id;
    _head = 0;
@@ -32,6 +31,7 @@ InputQueue::Init(int id, int input_size)
    _first_incorrect_frame = GameInput::NullFrame;
    _last_frame_requested = GameInput::NullFrame;
    _last_added_frame = GameInput::NullFrame;
+   _callbacks = callbacks;
 
    _prediction.init(GameInput::NullFrame, NULL, input_size);
 
@@ -202,7 +202,7 @@ InputQueue::AddInput(GameInput &input)
     */
    new_frame = AdvanceQueueHead(input.frame);
    if (new_frame != GameInput::NullFrame) {
-      AddDelayedInputToQueue(input, new_frame);
+      AddDelayedInputToQueue(input, new_frame, false);
    }
    
    /*
@@ -214,7 +214,7 @@ InputQueue::AddInput(GameInput &input)
 }
 
 void
-InputQueue::AddDelayedInputToQueue(GameInput &input, int frame_number)
+InputQueue::AddDelayedInputToQueue(GameInput &input, int frame_number, bool duplicate)
 {
    Log("adding delayed input frame number %d to queue.\n", frame_number);
 
@@ -222,11 +222,18 @@ InputQueue::AddDelayedInputToQueue(GameInput &input, int frame_number)
 
    ASSERT(frame_number == 0 || _inputs[PREVIOUS_FRAME(_head)].frame == frame_number - 1);
 
+   if (!_inputs[_head].duplicate)
+   {
+       //callback for freeing this GameInput object
+       _callbacks.free_input(_inputs[_head].bits, _inputs[_head].size);
+   }
+
    /*
     * Add the frame to the back of the queue
     */ 
    _inputs[_head] = input;
    _inputs[_head].frame = frame_number;
+   _inputs[_head].duplicate = duplicate;
    _head = (_head + 1) % INPUT_QUEUE_LENGTH;
    _length++;
    _first_frame = false;
@@ -293,7 +300,7 @@ InputQueue::AdvanceQueueHead(int frame)
       Log("Adding padding frame %d to account for change in frame delay.\n",
           expected_frame);
       GameInput &last_frame = _inputs[PREVIOUS_FRAME(_head)];     
-      AddDelayedInputToQueue(last_frame, expected_frame);
+      AddDelayedInputToQueue(last_frame, expected_frame, true);
       expected_frame++;
    }
 

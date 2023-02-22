@@ -251,6 +251,18 @@ typedef struct {
     * structure above for more information.
     */
    bool (__cdecl *on_event)(GGPOEvent *info);
+
+   /*
+    * Called when the input queue will overwrite a GameInput in the buffer, and
+    * allows the game to handle freeing any resources in it before it's deleted.
+    */
+   void (__cdecl* free_input)(void* input, int len);
+
+   /*
+    * Called when the game is comparing 2 inputs, in case the inputs contain pointers
+    * or otherwise need to be compared in a non bit-for-bit manner.
+    */
+   bool (__cdecl* compare_inputs)(void* input1, int len1, void* input2, int len2);
 } GGPOSessionCallbacks;
 
 /*

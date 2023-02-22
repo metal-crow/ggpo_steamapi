@@ -9,17 +9,18 @@
 #define _INPUT_QUEUE_H
 
 #include "game_input.h"
+#include "ggponet.h"
 
 #define INPUT_QUEUE_LENGTH    128
 #define DEFAULT_INPUT_SIZE      4
 
 class InputQueue {
 public:
-   InputQueue(int input_size = DEFAULT_INPUT_SIZE);
+   InputQueue();
    ~InputQueue();
 
 public:
-   void Init(int id, int input_size);
+   void Init(int id, int input_size, GGPOSessionCallbacks &callbacks);
    int GetLastConfirmedFrame();
    int GetFirstIncorrectFrame();
    int GetLength() { return _length; }
@@ -33,7 +34,7 @@ public:
 
 protected:
    int AdvanceQueueHead(int frame);
-   void AddDelayedInputToQueue(GameInput &input, int i);
+   void AddDelayedInputToQueue(GameInput &input, int i, bool duplicate);
    void Log(const char *fmt, ...);
 
 protected:
@@ -52,6 +53,8 @@ protected:
 
    GameInput            _inputs[INPUT_QUEUE_LENGTH];
    GameInput            _prediction;
+
+   GGPOSessionCallbacks _callbacks;
 };
 
 #endif
