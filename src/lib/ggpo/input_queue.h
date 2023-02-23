@@ -30,11 +30,11 @@ public:
    void DiscardConfirmedFrames(int frame);
    bool GetConfirmedInput(int frame, GameInput *input);
    bool GetInput(int frame, GameInput *input);
-   void AddInput(GameInput &input);
+   void AddInput(GameInput &input, bool isLocal);
 
 protected:
    int AdvanceQueueHead(int frame);
-   void AddDelayedInputToQueue(GameInput &input, int i, bool duplicate);
+   void AddDelayedInputToQueue(GameInput &input, int i, bool duplicate, bool isLocal);
    void Log(const char *fmt, ...);
 
 protected:

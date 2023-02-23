@@ -60,7 +60,7 @@ Sync::AddLocalInput(int queue, GameInput &input)
 {
    int frames_behind = _framecount - _last_confirmed_frame; 
    if (_framecount >= _max_prediction_frames && frames_behind >= _max_prediction_frames) {
-      Log("Rejecting input from emulator: reached prediction barrier.\n");
+      Log("Rejecting input from emulator: reached prediction barrier. local frame %d last confirmed frame %d\n", _framecount, _last_confirmed_frame);
       return false;
    }
 
@@ -70,7 +70,7 @@ Sync::AddLocalInput(int queue, GameInput &input)
 
    Log("Sending undelayed local frame %d to queue %d.\n", _framecount, queue);
    input.frame = _framecount;
-   _input_queues[queue].AddInput(input);
+   _input_queues[queue].AddInput(input, true);
 
    return true;
 }
@@ -78,7 +78,7 @@ Sync::AddLocalInput(int queue, GameInput &input)
 void
 Sync::AddRemoteInput(int queue, GameInput &input)
 {
-   _input_queues[queue].AddInput(input);
+   _input_queues[queue].AddInput(input, false);
 }
 
 int
