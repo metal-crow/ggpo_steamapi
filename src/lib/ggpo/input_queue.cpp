@@ -182,7 +182,7 @@ InputQueue::GetInput(int requested_frame, GameInput *input)
 }
 
 void
-InputQueue::AddInput(GameInput &input, bool isLocal)
+InputQueue::AddInput(GameInput &input)
 {
    int new_frame;
 
@@ -202,7 +202,7 @@ InputQueue::AddInput(GameInput &input, bool isLocal)
     */
    new_frame = AdvanceQueueHead(input.frame);
    if (new_frame != GameInput::NullFrame) {
-      AddDelayedInputToQueue(input, new_frame, false, isLocal);
+      AddDelayedInputToQueue(input, new_frame, false);
    }
    
    /*
@@ -214,7 +214,7 @@ InputQueue::AddInput(GameInput &input, bool isLocal)
 }
 
 void
-InputQueue::AddDelayedInputToQueue(GameInput &input, int frame_number, bool duplicate, bool isLocal)
+InputQueue::AddDelayedInputToQueue(GameInput &input, int frame_number, bool duplicate)
 {
    Log("adding delayed input frame number %d to queue.\n", frame_number);
 
@@ -222,7 +222,7 @@ InputQueue::AddDelayedInputToQueue(GameInput &input, int frame_number, bool dupl
 
    ASSERT(frame_number == 0 || _inputs[PREVIOUS_FRAME(_head)].frame == frame_number - 1);
 
-   if (!_inputs[_head].duplicate && _inputs[_head].local)
+   if (!_inputs[_head].duplicate)
    {
        //callback for freeing this GameInput object
        _callbacks.free_input(_inputs[_head].bits, _inputs[_head].size);
@@ -234,7 +234,6 @@ InputQueue::AddDelayedInputToQueue(GameInput &input, int frame_number, bool dupl
    _inputs[_head] = input;
    _inputs[_head].frame = frame_number;
    _inputs[_head].duplicate = duplicate;
-   _inputs[_head].local = isLocal;
    _head = (_head + 1) % INPUT_QUEUE_LENGTH;
    _length++;
    _first_frame = false;
@@ -301,7 +300,7 @@ InputQueue::AdvanceQueueHead(int frame)
       Log("Adding padding frame %d to account for change in frame delay.\n",
           expected_frame);
       GameInput &last_frame = _inputs[PREVIOUS_FRAME(_head)];     
-      AddDelayedInputToQueue(last_frame, expected_frame, true, last_frame.local);
+      AddDelayedInputToQueue(last_frame, expected_frame, true);
       expected_frame++;
    }
 

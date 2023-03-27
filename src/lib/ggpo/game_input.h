@@ -23,7 +23,6 @@ struct GameInput {
    };
    int      frame;
    bool     duplicate;
-   bool     local;
    int      size; /* size in bytes of the entire input for all players */
    uint8    bits[GAMEINPUT_MAX_BYTES * GAMEINPUT_MAX_PLAYERS];
 
