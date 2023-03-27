@@ -35,7 +35,6 @@ Sync::Init(Sync::Config &config)
 {
    _config = config;
    _callbacks = config.callbacks;
-   GameInputCallbacks = config.callbacks; //set up static pointer for GameInput to use
    _framecount = 0;
    _rollingback = false;
 
@@ -249,7 +248,7 @@ Sync::CreateQueues(Config &config)
    _input_queues = new InputQueue[_config.num_players];
 
    for (int i = 0; i < _config.num_players; i++) {
-      _input_queues[i].Init(i, _config.input_size, _callbacks);
+      _input_queues[i].Init(i, _config.input_size);
    }
    return true;
 }

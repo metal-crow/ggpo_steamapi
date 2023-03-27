@@ -10,19 +10,15 @@
 
 #include <stdio.h>
 #include <memory.h>
-#include "ggponet.h"
 
 #define GAMEINPUT_MAX_BYTES      300
 #define GAMEINPUT_MAX_PLAYERS    6
-
-extern GGPOSessionCallbacks GameInputCallbacks;
 
 struct GameInput {
    enum Constants {
       NullFrame = -1
    };
    int      frame;
-   bool     duplicate;
    int      size; /* size in bytes of the entire input for all players */
    uint8    bits[GAMEINPUT_MAX_BYTES * GAMEINPUT_MAX_PLAYERS];
 

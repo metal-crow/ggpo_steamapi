@@ -9,8 +9,6 @@
 #include "game_input.h"
 #include "log.h"
 
-GGPOSessionCallbacks GameInputCallbacks = {};
-
 void
 GameInput::init(int iframe, char *ibits, int isize, int offset)
 {
@@ -22,7 +20,6 @@ GameInput::init(int iframe, char *ibits, int isize, int offset)
    if (ibits) {
       memcpy(bits + (offset * isize), ibits, isize);
    }
-   duplicate = false;
 }
 
 void
@@ -36,7 +33,6 @@ GameInput::init(int iframe, char *ibits, int isize)
    if (ibits) {
       memcpy(bits, ibits, isize);
    }
-   duplicate = false;
 }
 
 void
@@ -73,13 +69,12 @@ GameInput::equal(GameInput &other, bool bitsonly)
    if (size != other.size) {
       Log("sizes don't match: %d, %d\n", size, other.size);
    }
-   bool bitsequal = GameInputCallbacks.compare_inputs(bits, size, other.bits, other.size);
-   if (bitsequal) {
+   if (memcmp(bits, other.bits, size)) {
       Log("bits don't match\n");
    }
    ASSERT(size && other.size);
    return (bitsonly || frame == other.frame) &&
           size == other.size &&
-          bitsequal;
+          memcmp(bits, other.bits, size) == 0;
 }
 
