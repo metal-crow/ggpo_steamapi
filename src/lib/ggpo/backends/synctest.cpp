@@ -147,7 +147,7 @@ SyncTestBackend::IncrementFrame(void)
             LogSaveStates(info);
             RaiseSyncError("Checksum for frame %d does not match saved (%d != %d)", frame, checksum, info.checksum);
          }
-         printf("Checksum %08d for frame %d matches.\n", checksum, info.frame);
+         fprintf(_logfp, "Checksum %08d for frame %d matches.\n", checksum, info.frame);
          free(info.buf);
       }
       _last_verified = frame;
@@ -166,8 +166,7 @@ SyncTestBackend::RaiseSyncError(const char *fmt, ...)
    vsprintf_s(buf, ARRAY_SIZE(buf), fmt, args);
    va_end(args);
 
-   puts(buf);
-   OutputDebugStringA(buf);
+   fprintf(_logfp, "%s\n", buf);
    EndLog();
    RaiseException(0xC0000000, 0, 0, NULL);
 }
