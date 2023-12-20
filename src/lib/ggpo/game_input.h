@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <memory.h>
 
-#define GAMEINPUT_MAX_BYTES      300
+#define GAMEINPUT_MAX_BYTES      200
 #define GAMEINPUT_MAX_PLAYERS    6
 
 struct GameInput {

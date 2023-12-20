@@ -11,7 +11,7 @@
 #include "game_input.h"
 
 //want GAMEINPUT_MAX_BYTES*UDP_MSG_MAX_FRAMES + rest of the input struct size to be < the steam max packet size (1400)
-#define UDP_MSG_MAX_FRAMES           4
+#define UDP_MSG_MAX_FRAMES           5
 #define UDP_MSG_MAX_PLAYERS          6
 
 #pragma pack(push, 1)
