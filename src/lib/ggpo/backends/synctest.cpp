@@ -166,7 +166,9 @@ SyncTestBackend::RaiseSyncError(const char *fmt, ...)
    vsprintf_s(buf, ARRAY_SIZE(buf), fmt, args);
    va_end(args);
 
-   fprintf(_logfp, "%s\n", buf);
+   if (_logfp) {
+       fprintf(_logfp, "%s\n", buf);
+   }
    EndLog();
    RaiseException(0xC0000000, 0, 0, NULL);
 }
