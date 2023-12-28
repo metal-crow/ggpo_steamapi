@@ -121,7 +121,8 @@ SyncTestBackend::IncrementFrame(void)
    info.input = _last_input;
    info.cbuf = _sync.GetLastSavedFrame().cbuf;
    info.buf = (char *)malloc(info.cbuf);
-   memcpy(info.buf, _sync.GetLastSavedFrame().buf, info.cbuf);
+   //Need to do a deep copy here since we support pointers in this blob
+   _callbacks.copy_buffer(info.buf, _sync.GetLastSavedFrame().buf);
    info.checksum = _sync.GetLastSavedFrame().checksum;
    _saved_frames.push(info);
 

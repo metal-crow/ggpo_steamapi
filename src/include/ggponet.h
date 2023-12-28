@@ -230,10 +230,17 @@ typedef struct {
    bool (__cdecl *log_game_state)(char *filename, unsigned char *buffer, int len);
 
    /*
+    * copy_buffer - Copy a game state allocated in save_game_state into a new
+    * buffer. Do a full deep copy, the original may be free'd using free_buffer.
+    * The dst buffer will be malloc'd before this call.
+    */
+   void (__cdecl *copy_buffer)(void* buffer_dst, void* buffer_src);
+
+   /*
     * free_buffer - Frees a game state allocated in save_game_state.  You
     * should deallocate the memory contained in the buffer.
     */
-   void (__cdecl *free_buffer)(void *buffer);
+   void(__cdecl* free_buffer)(void* buffer);
 
    /*
     * advance_frame - Called during a rollback.  You should advance your game
