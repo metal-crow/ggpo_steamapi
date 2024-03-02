@@ -148,7 +148,10 @@ SyncTestBackend::IncrementFrame(void)
             LogSaveStates(info);
             RaiseSyncError("Checksum for frame %d does not match saved (%d != %d)", frame, checksum, info.checksum);
          }
-         fprintf(_logfp, "Checksum %08d for frame %d matches.\n", checksum, info.frame);
+         if (_logfp)
+         {
+             fprintf(_logfp, "Checksum %08d for frame %d matches.\n", checksum, info.frame);
+         }
          free(info.buf);
       }
       _last_verified = frame;
