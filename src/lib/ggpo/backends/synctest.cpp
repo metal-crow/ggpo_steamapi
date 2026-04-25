@@ -152,7 +152,7 @@ SyncTestBackend::IncrementFrame(void)
          {
              fprintf(_logfp, "Checksum %08d for frame %d matches.\n", checksum, info.frame);
          }
-         free(info.buf);
+         _callbacks.free_buffer(info.buf);
       }
       _last_verified = frame;
       _rollingback = false;
